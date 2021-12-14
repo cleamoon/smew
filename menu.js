@@ -12,12 +12,20 @@ const fs = require("fs");
 
 const template = [
     {
-        role: "help",
+        label: "File",
         submenu: [
             {
-                label: "About Editor Component",
+                label: "Open",
+                accelerator: "CommandOrControl+O",
                 click() {
-                    shell.openExternal("https://simplemde.com/");
+                    loadFile();
+                }
+            },
+            {
+                label: "Save",
+                accelerator: "CommandOrControl+S",
+                click() {
+                    saveFile();
                 }
             }
         ]
@@ -33,6 +41,17 @@ const template = [
                         'editor-event',
                         'toggle-bold'
                     );
+                }
+            }
+        ]
+    },
+    {
+        role: "help",
+        submenu: [
+            {
+                label: "About Editor Component",
+                click() {
+                    shell.openExternal("https://simplemde.com/");
                 }
             }
         ]
@@ -84,13 +103,12 @@ ipcMain.on("editor-reply", (event, arg) => {
 ipcMain.on("save", (event, arg) => {
     //console.log(`Saving content of the file`);
     //console.log(arg);
-
     const window = BrowserWindow.getFocusedWindow();
     const options = {
         title: 'Save markdown file',
         filters: [
             {
-                name: "MyFile",
+                name: "Markdown file",
                 extensions: ["md"]
             }, 
             {
@@ -109,32 +127,36 @@ ipcMain.on("save", (event, arg) => {
         });
 });
 
+function saveFile() {
+    const window = BrowserWindow.getFocusedWindow();
+    window.webContents.send("editor-event", "save");
+}
+
+function loadFile() {
+    const window = BrowserWindow.getFocusedWindow();
+    const options = {
+        title: "Pick a markdown file",
+        filters: [
+            { name: "Markdown files", extensions: ["md"] },
+            { name: "Text files", extensions: ["txt"] }
+        ]
+    };
+    dialog.showOpenDialog(window, options)
+    .then(result => {
+        const content = fs.readFileSync(result.filePaths[0]).toString();
+        window.webContents.send("load", content);
+    }).catch(err => {
+        console.log(err)
+    });
+}
+
 
 app.on("ready", () => {
     globalShortcut.register("CommandOrControl+S", () => {
-        const window = BrowserWindow.getFocusedWindow();
-        window.webContents.send("editor-event", "save");
-        console.log("Saving the file");
+        saveFile();
     });
 
     globalShortcut.register("CommandOrControl+O", () => {
-        const window = BrowserWindow.getFocusedWindow();
-
-        const options = {
-            title: 'Pick a markdown file',
-            filters: [
-                { name: "Markdown files", extensions: ["md"] },
-                { name: "Text files", extensions: ["txt"] }
-            ]
-        };
-
-        dialog.showOpenDialog(window, options)
-        .then(result => {
-            const content = fs.readFileSync(result.filePaths[0]).toString();
-            console.log(`Opening file: ${result.filePaths[0]}`);    
-            window.webContents.send("load", content);
-        }).catch(err => {
-            console.log(err)
-        });
+        loadFile();
     });
 });
