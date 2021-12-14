@@ -1,11 +1,14 @@
-const { 
-    app, 
-    Menu, 
-    shell, 
-    BrowserWindow, 
-    globalShortcut, 
-    dialog 
+const {
+    app,
+    Menu,
+    shell,
+    ipcMain,
+    BrowserWindow,
+    globalShortcut,
+    dialog
 } = require("electron")
+
+const fs = require("fs");
 
 const template = [
     {
@@ -52,15 +55,15 @@ if (process.env.DEBUG) {
         label: "Debugging",
         submenu: [
             {
-                lable: "Dev tools",
+                label: "Dev tools",
                 role: "toggleDevTools"
             },
 
-            { 
-                type: "separator" 
+            {
+                type: "separator"
             },
 
-            { 
+            {
                 role: "reload",
                 accelerator: "Alt+R"
             }
@@ -70,42 +73,68 @@ if (process.env.DEBUG) {
 
 const menu = Menu.buildFromTemplate(template);
 
-module.exports = menu; 
+module.exports = menu;
 
-const { ipcMain } = require("electron");
+const path = require("path");
 
 ipcMain.on("editor-reply", (event, arg) => {
     console.log(`Received reply from web page: ${arg}`);
 });
 
 ipcMain.on("save", (event, arg) => {
-    console.log(`Saving content of the file`);
-    console.log(arg);
+    //console.log(`Saving content of the file`);
+    //console.log(arg);
 
     const window = BrowserWindow.getFocusedWindow();
     const options = {
-        title: "Save markdown file",
+        title: 'Save markdown file',
         filters: [
             {
                 name: "MyFile",
                 extensions: ["md"]
+            }, 
+            {
+                name: "All files",
+                extensions: ["*"]
             }
         ]
     };
 
-    dialog.showSaveDialog(window, options, filename => {
-        const fs = require('fs');
-        if (filename) {
-            console.log(`Saving content to the file: ${filename}`);
-            fs.writeFileSync(filename, arg);
-        }
-    });
+    dialog.showSaveDialog(window, options)
+        .then(result => {
+            fs.writeFileSync(result.filePath, arg);
+            console.log(`Saving content to the file: ${result.filePath}`);    
+        }).catch(err => {
+            console.log(err)
+        });
 });
 
+
 app.on("ready", () => {
-    globalShortcut.register("CommandOrontrol+S", () => {
-        console.log("Saving the file");
+    globalShortcut.register("CommandOrControl+S", () => {
         const window = BrowserWindow.getFocusedWindow();
         window.webContents.send("editor-event", "save");
+        console.log("Saving the file");
+    });
+
+    globalShortcut.register("CommandOrControl+O", () => {
+        const window = BrowserWindow.getFocusedWindow();
+
+        const options = {
+            title: 'Pick a markdown file',
+            filters: [
+                { name: "Markdown files", extensions: ["md"] },
+                { name: "Text files", extensions: ["txt"] }
+            ]
+        };
+
+        dialog.showOpenDialog(window, options)
+        .then(result => {
+            const content = fs.readFileSync(result.filePaths[0]).toString();
+            console.log(`Opening file: ${result.filePaths[0]}`);    
+            window.webContents.send("load", content);
+        }).catch(err => {
+            console.log(err)
+        });
     });
 });
